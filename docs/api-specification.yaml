@@ -1,0 +1,718 @@
+openapi: 3.0.0
+info:
+  title: Claude AWS Account Marketplace API
+  description: API for managing and browsing AWS accounts with Claude model quotas
+  version: 1.0.0
+  
+servers:
+  - url: https://api.claude-accounts.com/v1
+    description: Production server
+  - url: http://localhost:3000/api/v1
+    description: Development server
+
+paths:
+  # ==================== Public Endpoints ====================
+  
+  /accounts:
+    get:
+      summary: List all available accounts
+      description: Returns a paginated list of AWS accounts with filtering options
+      tags:
+        - Public
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 12
+            minimum: 1
+            maximum: 100
+        - name: models
+          in: query
+          description: Filter by Claude model types (comma-separated)
+          schema:
+            type: string
+            example: "CLAUDE_35_SONNET,CLAUDE_40_OPUS_4_V1"
+        - name: quotaLevel
+          in: query
+          schema:
+            type: string
+            enum: [HIGH, MEDIUM, LOW]
+        - name: minPrice
+          in: query
+          schema:
+            type: number
+            minimum: 0
+        - name: maxPrice
+          in: query
+          schema:
+            type: number
+            minimum: 0
+        - name: inStock
+          in: query
+          schema:
+            type: boolean
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [price_asc, price_desc, created_asc, created_desc, quota_level]
+            default: created_desc
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AccountListing'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                  filters:
+                    $ref: '#/components/schemas/ActiveFilters'
+
+  /accounts/{accountId}:
+    get:
+      summary: Get account details
+      description: Returns detailed information about a specific account
+      tags:
+        - Public
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDetail'
+        '404':
+          description: Account not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /filters/options:
+    get:
+      summary: Get available filter options
+      description: Returns all available filter options based on current inventory
+      tags:
+        - Public
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  models:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        value:
+                          type: string
+                        label:
+                          type: string
+                        count:
+                          type: integer
+                  quotaLevels:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        value:
+                          type: string
+                        label:
+                          type: string
+                        count:
+                          type: integer
+                  priceRange:
+                    type: object
+                    properties:
+                      min:
+                        type: number
+                      max:
+                        type: number
+
+  # ==================== Admin Endpoints ====================
+  
+  /admin/auth/login:
+    post:
+      summary: Admin login
+      description: Authenticate admin user and receive session token
+      tags:
+        - Admin Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  admin:
+                    $ref: '#/components/schemas/AdminInfo'
+                  expiresAt:
+                    type: string
+                    format: date-time
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/auth/logout:
+    post:
+      summary: Admin logout
+      description: Invalidate current session
+      tags:
+        - Admin Auth
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /admin/accounts:
+    get:
+      summary: List all accounts (admin view)
+      description: Returns all accounts with full management information
+      tags:
+        - Admin Management
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [AVAILABLE, MAINTENANCE, SOLD, ALL]
+            default: ALL
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AccountAdmin'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+    
+    post:
+      summary: Create new account
+      description: Add a new AWS account to the marketplace
+      tags:
+        - Admin Management
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountRequest'
+      responses:
+        '201':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountAdmin'
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /admin/accounts/{accountId}:
+    get:
+      summary: Get account details (admin view)
+      description: Returns full account information including sensitive data
+      tags:
+        - Admin Management
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountAdmin'
+    
+    put:
+      summary: Update account
+      description: Update account information
+      tags:
+        - Admin Management
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAccountRequest'
+      responses:
+        '200':
+          description: Account updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountAdmin'
+    
+    delete:
+      summary: Delete account
+      description: Remove account from the marketplace
+      tags:
+        - Admin Management
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Account deleted successfully
+
+  /admin/accounts/{accountId}/refresh-quota:
+    post:
+      summary: Refresh account quotas
+      description: Trigger quota update using external Python script
+      tags:
+        - Admin Management
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Quota refresh initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  quotas:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModelQuota'
+        '202':
+          description: Quota refresh queued (async)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  jobId:
+                    type: string
+
+  /admin/audit-logs:
+    get:
+      summary: Get audit logs
+      description: Returns system audit logs
+      tags:
+        - Admin Management
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: action
+          in: query
+          schema:
+            type: string
+            enum: [ACCOUNT_CREATED, ACCOUNT_UPDATED, ACCOUNT_DELETED, ACCOUNT_STATUS_CHANGED, QUOTA_UPDATED, ADMIN_LOGIN, ADMIN_LOGOUT, PRICE_CHANGED]
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditLog'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+components:
+  schemas:
+    AccountListing:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        displayName:
+          type: string
+        primaryModels:
+          type: array
+          items:
+            type: string
+        quotaLevel:
+          type: string
+          enum: [HIGH, MEDIUM, LOW]
+        price:
+          $ref: '#/components/schemas/Money'
+        status:
+          type: string
+          enum: [AVAILABLE, MAINTENANCE, SOLD]
+        stockAvailable:
+          type: boolean
+        
+    AccountDetail:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        displayName:
+          type: string
+        modelQuotas:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelQuotaDisplay'
+        price:
+          $ref: '#/components/schemas/Money'
+        instructions:
+          type: string
+        features:
+          type: array
+          items:
+            type: string
+        limitations:
+          type: array
+          items:
+            type: string
+        telegramLink:
+          type: string
+          
+    AccountAdmin:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        displayName:
+          type: string
+        status:
+          type: string
+          enum: [AVAILABLE, MAINTENANCE, SOLD]
+        price:
+          $ref: '#/components/schemas/Money'
+        instructions:
+          type: string
+        features:
+          type: array
+          items:
+            type: string
+        limitations:
+          type: array
+          items:
+            type: string
+        quotaLevel:
+          type: string
+          enum: [HIGH, MEDIUM, LOW]
+        quotas:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelQuota'
+        lastQuotaUpdate:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          
+    CreateAccountRequest:
+      type: object
+      required:
+        - name
+        - displayName
+        - awsAccessKey
+        - awsSecretKey
+        - price
+      properties:
+        name:
+          type: string
+          pattern: '^[a-zA-Z0-9-_]+$'
+        displayName:
+          type: string
+        awsAccessKey:
+          type: string
+        awsSecretKey:
+          type: string
+        price:
+          $ref: '#/components/schemas/Money'
+        instructions:
+          type: string
+        features:
+          type: array
+          items:
+            type: string
+        limitations:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [AVAILABLE, MAINTENANCE]
+          default: AVAILABLE
+          
+    UpdateAccountRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+        price:
+          $ref: '#/components/schemas/Money'
+        instructions:
+          type: string
+        features:
+          type: array
+          items:
+            type: string
+        limitations:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+          enum: [AVAILABLE, MAINTENANCE, SOLD]
+          
+    ModelQuota:
+      type: object
+      properties:
+        modelType:
+          type: string
+          enum: [CLAUDE_35_HAIKU, CLAUDE_35_SONNET, CLAUDE_35_SONNET_V2, CLAUDE_37_SONNET_V1, CLAUDE_40_OPUS_4_V1, CLAUDE_40_SONNET_4_V1]
+        rpm:
+          type: integer
+        tpm:
+          type: integer
+        tpd:
+          type: integer
+        isAvailable:
+          type: boolean
+          
+    ModelQuotaDisplay:
+      type: object
+      properties:
+        modelName:
+          type: string
+        modelDisplayName:
+          type: string
+        rpm:
+          type: integer
+        tpm:
+          type: integer
+        tpd:
+          type: integer
+        available:
+          type: boolean
+          
+    Money:
+      type: object
+      properties:
+        amount:
+          type: number
+        currency:
+          type: string
+          
+    AdminInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        lastLogin:
+          type: string
+          format: date-time
+          
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+        adminId:
+          type: string
+        adminUsername:
+          type: string
+        accountId:
+          type: string
+        accountName:
+          type: string
+        action:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: string
+        changes:
+          type: object
+        metadata:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+          
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+        hasNext:
+          type: boolean
+        hasPrev:
+          type: boolean
+          
+    ActiveFilters:
+      type: object
+      properties:
+        models:
+          type: array
+          items:
+            type: string
+        quotaLevel:
+          type: string
+        priceRange:
+          type: object
+          properties:
+            min:
+              type: number
+            max:
+              type: number
+        inStock:
+          type: boolean
+          
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+          
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

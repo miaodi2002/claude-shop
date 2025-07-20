@@ -1,0 +1,189 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ==================== Account Management Context ====================
+
+model Account {
+  id                String         @id @default(cuid())
+  name              String         @unique
+  displayName       String
+  awsAccessKeyHash  String         // Encrypted AWS Access Key
+  awsSecretKeyHash  String         // Encrypted AWS Secret Key
+  status            AccountStatus  @default(AVAILABLE)
+  priceAmount       Decimal        @db.Decimal(10, 2)
+  priceCurrency     String         @default("USD")
+  instructions      String         @db.Text
+  features          String[]       @default([])
+  limitations       String[]       @default([])
+  quotaLevel        QuotaLevel     @default(LOW)
+  
+  // Relationships
+  quotas            ModelQuota[]
+  auditLogs         AuditLog[]
+  
+  // Timestamps
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  lastQuotaUpdate   DateTime?
+  
+  @@index([status])
+  @@index([quotaLevel])
+  @@index([priceAmount])
+}
+
+enum AccountStatus {
+  AVAILABLE
+  MAINTENANCE
+  SOLD
+}
+
+enum QuotaLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+model ModelQuota {
+  id              String         @id @default(cuid())
+  accountId       String
+  modelType       ClaudeModel
+  rpm             Int            // Requests per minute
+  tpm             Int            // Tokens per minute  
+  tpd             Int            // Tokens per day
+  isAvailable     Boolean        @default(true)
+  
+  // Relationships
+  account         Account        @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  @@unique([accountId, modelType])
+  @@index([modelType])
+}
+
+enum ClaudeModel {
+  CLAUDE_35_HAIKU
+  CLAUDE_35_SONNET
+  CLAUDE_35_SONNET_V2
+  CLAUDE_37_SONNET_V1
+  CLAUDE_40_OPUS_4_V1
+  CLAUDE_40_SONNET_4_V1
+}
+
+// ==================== Admin Context ====================
+
+model Admin {
+  id              String         @id @default(cuid())
+  username        String         @unique
+  passwordHash    String
+  isActive        Boolean        @default(true)
+  
+  // Relationships
+  sessions        AdminSession[]
+  auditLogs       AuditLog[]
+  
+  // Timestamps
+  lastLogin       DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model AdminSession {
+  id              String         @id @default(cuid())
+  adminId         String
+  token           String         @unique
+  userAgent       String?
+  ipAddress       String?
+  
+  // Relationships
+  admin           Admin          @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  expiresAt       DateTime
+  createdAt       DateTime       @default(now())
+  
+  @@index([token])
+  @@index([expiresAt])
+}
+
+// ==================== Audit & Event Tracking ====================
+
+model AuditLog {
+  id              String         @id @default(cuid())
+  adminId         String?
+  accountId       String?
+  action          AuditAction
+  entityType      String
+  entityId        String
+  changes         Json?          // Store the actual changes made
+  metadata        Json?          // Additional context
+  
+  // Relationships
+  admin           Admin?         @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  account         Account?       @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  
+  // Timestamps
+  createdAt       DateTime       @default(now())
+  
+  @@index([adminId])
+  @@index([accountId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+enum AuditAction {
+  ACCOUNT_CREATED
+  ACCOUNT_UPDATED
+  ACCOUNT_DELETED
+  ACCOUNT_STATUS_CHANGED
+  QUOTA_UPDATED
+  ADMIN_LOGIN
+  ADMIN_LOGOUT
+  PRICE_CHANGED
+}
+
+// ==================== System Configuration ====================
+
+model SystemConfig {
+  id              String         @id @default(cuid())
+  key             String         @unique
+  value           Json
+  description     String?
+  
+  // Timestamps
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+// ==================== View Models (for optimized queries) ====================
+
+// This could be a database view or materialized view for performance
+// Created via migration for optimized listing queries
+// CREATE VIEW account_listings AS
+// SELECT 
+//   a.id,
+//   a.name,
+//   a.display_name,
+//   a.status,
+//   a.price_amount,
+//   a.price_currency,
+//   a.quota_level,
+//   a.created_at,
+//   a.updated_at,
+//   CASE WHEN a.status = 'AVAILABLE' THEN true ELSE false END as stock_available,
+//   array_agg(DISTINCT mq.model_type) FILTER (WHERE mq.is_available = true) as supported_models
+// FROM accounts a
+// LEFT JOIN model_quotas mq ON a.id = mq.account_id
+// GROUP BY a.id;
