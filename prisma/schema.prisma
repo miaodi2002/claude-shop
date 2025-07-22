@@ -82,6 +82,44 @@ enum ClaudeModel {
   CLAUDE_40_SONNET_4_V1
 }
 
+// ==================== Claude Account Context ====================
+
+model ClaudeAccount {
+  id            String                 @id @default(cuid())
+  apiKey        String                 @unique // Encrypted
+  accountName   String
+  email         String?
+  organization  String?
+  status        ClaudeAccountStatus    @default(ACTIVE)
+  tier          ClaudeTier            @default(FREE)
+  usageLimit    Int?                  // Monthly usage limit in tokens
+  currentUsage  Int                   @default(0)
+  features      Json?                 // JSON object for feature flags
+  metadata      Json?                 // Additional metadata
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  
+  // Relations
+  auditLogs     AuditLog[]
+  
+  @@index([status])
+  @@index([tier])
+  @@index([accountName])
+}
+
+enum ClaudeAccountStatus {
+  ACTIVE
+  SUSPENDED  
+  EXPIRED
+  PENDING
+}
+
+enum ClaudeTier {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
 // ==================== Admin Context ====================
 
 model Admin {
@@ -121,24 +159,27 @@ model AdminSession {
 // ==================== Audit & Event Tracking ====================
 
 model AuditLog {
-  id              String         @id @default(cuid())
-  adminId         String?
-  accountId       String?
-  action          AuditAction
-  entityType      String
-  entityId        String
-  changes         Json?          // Store the actual changes made
-  metadata        Json?          // Additional context
+  id                String         @id @default(cuid())
+  adminId           String?
+  accountId         String?
+  claudeAccountId   String?
+  action            AuditAction
+  entityType        String
+  entityId          String
+  changes           Json?          // Store the actual changes made
+  metadata          Json?          // Additional context
   
   // Relationships
-  admin           Admin?         @relation(fields: [adminId], references: [id], onDelete: SetNull)
-  account         Account?       @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  admin             Admin?         @relation(fields: [adminId], references: [id], onDelete: SetNull)
+  account           Account?       @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  claudeAccount     ClaudeAccount? @relation(fields: [claudeAccountId], references: [id], onDelete: SetNull)
   
   // Timestamps
-  createdAt       DateTime       @default(now())
+  createdAt         DateTime       @default(now())
   
   @@index([adminId])
   @@index([accountId])
+  @@index([claudeAccountId])
   @@index([action])
   @@index([createdAt])
 }
@@ -149,6 +190,11 @@ enum AuditAction {
   ACCOUNT_DELETED
   ACCOUNT_STATUS_CHANGED
   QUOTA_UPDATED
+  CLAUDE_ACCOUNT_CREATED
+  CLAUDE_ACCOUNT_UPDATED
+  CLAUDE_ACCOUNT_DELETED
+  CLAUDE_ACCOUNT_STATUS_CHANGED
+  CLAUDE_ACCOUNT_VIEWED
   ADMIN_LOGIN
   ADMIN_LOGIN_SUCCESS
   ADMIN_LOGIN_FAILED

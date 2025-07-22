@@ -151,6 +151,64 @@ export function validateSortBy(sortBy: string): { field: string; direction: 'asc
   return { field, direction: direction as 'asc' | 'desc' }
 }
 
+// Claude 账户相关
+export const claudeAccountStatusSchema = z.enum(['ACTIVE', 'SUSPENDED', 'EXPIRED', 'PENDING'])
+export const claudeTierSchema = z.enum(['FREE', 'PRO', 'ENTERPRISE'])
+
+// 创建 Claude 账户
+export const createClaudeAccountSchema = z.object({
+  apiKey: z.string()
+    .min(1, 'API key is required')
+    .max(500, 'API key must not exceed 500 characters'),
+  accountName: z.string()
+    .min(1, 'Account name is required')
+    .max(100, 'Account name must not exceed 100 characters'),
+  email: z.string()
+    .email('Invalid email format')
+    .optional(),
+  organization: z.string()
+    .max(100, 'Organization must not exceed 100 characters')
+    .optional(),
+  tier: claudeTierSchema.optional(),
+  usageLimit: z.number()
+    .positive('Usage limit must be positive')
+    .optional(),
+  features: z.object({}).passthrough().optional(),
+  metadata: z.object({}).passthrough().optional()
+})
+
+// 更新 Claude 账户（不包括 apiKey）
+export const updateClaudeAccountSchema = createClaudeAccountSchema.partial().omit({ 
+  apiKey: true 
+})
+
+// Claude 账户查询参数
+export const claudeAccountQuerySchema = z.object({
+  page: z.coerce.number().positive().default(1),
+  limit: z.coerce.number().positive().max(100).default(10),
+  sortBy: z.string().default('createdAt'),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+  search: z.string().optional(),
+  status: claudeAccountStatusSchema.optional(),
+  tier: claudeTierSchema.optional()
+})
+
+// Claude 账户响应格式
+export const claudeAccountResponseSchema = z.object({
+  id: z.string(),
+  accountName: z.string(),
+  email: z.string().nullable(),
+  organization: z.string().nullable(),
+  status: claudeAccountStatusSchema,
+  tier: claudeTierSchema,
+  usageLimit: z.number().nullable(),
+  currentUsage: z.number(),
+  features: z.object({}).passthrough().nullable(),
+  metadata: z.object({}).passthrough().nullable(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+})
+
 // 类型导出
 export type AccountQuery = z.infer<typeof accountQuerySchema>
 export type CreateAccount = z.infer<typeof createAccountSchema>
@@ -159,3 +217,9 @@ export type AccountListing = z.infer<typeof accountListingSchema>
 export type AccountDetail = z.infer<typeof accountDetailSchema>
 export type AdminLogin = z.infer<typeof adminLoginSchema>
 export type AuditLog = z.infer<typeof auditLogSchema>
+
+// Claude 账户类型导出
+export type CreateClaudeAccount = z.infer<typeof createClaudeAccountSchema>
+export type UpdateClaudeAccount = z.infer<typeof updateClaudeAccountSchema>
+export type ClaudeAccountQuery = z.infer<typeof claudeAccountQuerySchema>
+export type ClaudeAccountResponse = z.infer<typeof claudeAccountResponseSchema>
