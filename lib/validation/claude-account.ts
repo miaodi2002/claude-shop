@@ -1,9 +1,9 @@
 import { z } from 'zod'
 
-// Claude Account Status Enum
+// Claude Account Status Enum (from backend spec)
 export const claudeAccountStatusSchema = z.enum(['ACTIVE', 'SUSPENDED', 'EXPIRED', 'PENDING'])
 
-// Claude Account Tier Enum  
+// Claude Account Tier Enum (from backend spec)  
 export const claudeAccountTierSchema = z.enum(['FREE', 'PRO', 'ENTERPRISE'])
 
 // Base Claude Account Schema
@@ -32,8 +32,8 @@ export const claudeAccountSchema = z.object({
     .default(0),
   features: z.record(z.unknown()).optional(),
   metadata: z.record(z.unknown()).optional(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 })
 
 // Create Claude Account Schema (for forms)
