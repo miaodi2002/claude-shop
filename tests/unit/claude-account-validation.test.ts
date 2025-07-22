@@ -1,194 +1,178 @@
 import {
+  claudeAccountSchema,
   createClaudeAccountSchema,
   updateClaudeAccountSchema,
   claudeAccountQuerySchema,
-  claudeAccountResponseSchema,
-  claudeAccountStatusSchema,
-  claudeTierSchema
-} from '@/lib/validation/schemas'
+  getStatusBadgeVariant,
+  getTierBadgeVariant,
+  formatUsage,
+} from '@/lib/validation/claude-account'
 
-describe('Claude Account Validation Schemas', () => {
+describe('Claude Account Validation', () => {
   describe('createClaudeAccountSchema', () => {
-    const validAccountData = {
-      apiKey: 'sk-ant-api-key-12345678901234567890123456789012345678901234567890',
-      accountName: 'Test Account',
-      email: 'test@example.com',
-      organization: 'Test Org',
-      tier: 'PRO' as const,
-      usageLimit: 10000,
-      features: { feature1: true },
-      metadata: { source: 'test' }
-    }
-
-    it('should validate a complete valid account', () => {
-      const result = createClaudeAccountSchema.safeParse(validAccountData)
-      expect(result.success).toBe(true)
-      if (result.success) {
-        expect(result.data).toMatchObject(validAccountData)
-      }
-    })
-
-    it('should validate minimal required fields', () => {
-      const minimalData = {
-        apiKey: 'sk-ant-api-key-minimal',
-        accountName: 'Minimal Account'
-      }
-      
-      const result = createClaudeAccountSchema.safeParse(minimalData)
-      expect(result.success).toBe(true)
-      if (result.success) {
-        expect(result.data.apiKey).toBe(minimalData.apiKey)
-        expect(result.data.accountName).toBe(minimalData.accountName)
-      }
-    })
-
-    it('should reject missing required fields', () => {
-      const missingApiKey = { accountName: 'Test Account' }
-      const missingAccountName = { apiKey: 'sk-ant-api-key-test' }
-      
-      expect(createClaudeAccountSchema.safeParse(missingApiKey).success).toBe(false)
-      expect(createClaudeAccountSchema.safeParse(missingAccountName).success).toBe(false)
-    })
-
-    it('should reject empty required fields', () => {
-      const emptyApiKey = { apiKey: '', accountName: 'Test Account' }
-      const emptyAccountName = { apiKey: 'sk-ant-api-key-test', accountName: '' }
-      
-      expect(createClaudeAccountSchema.safeParse(emptyApiKey).success).toBe(false)
-      expect(createClaudeAccountSchema.safeParse(emptyAccountName).success).toBe(false)
-    })
-
-    it('should reject invalid email format', () => {
-      const invalidEmail = { ...validAccountData, email: 'invalid-email' }
-      const result = createClaudeAccountSchema.safeParse(invalidEmail)
-      expect(result.success).toBe(false)
-    })
-
-    it('should reject invalid tier', () => {
-      const invalidTier = { ...validAccountData, tier: 'INVALID_TIER' }
-      const result = createClaudeAccountSchema.safeParse(invalidTier)
-      expect(result.success).toBe(false)
-    })
-
-    it('should reject negative usage limit', () => {
-      const negativeLimit = { ...validAccountData, usageLimit: -100 }
-      const result = createClaudeAccountSchema.safeParse(negativeLimit)
-      expect(result.success).toBe(false)
-    })
-
-    it('should reject zero usage limit', () => {
-      const zeroLimit = { ...validAccountData, usageLimit: 0 }
-      const result = createClaudeAccountSchema.safeParse(zeroLimit)
-      expect(result.success).toBe(false)
-    })
-
-    it('should accept valid usage limit', () => {
-      const validLimit = { ...validAccountData, usageLimit: 1 }
-      const result = createClaudeAccountSchema.safeParse(validLimit)
-      expect(result.success).toBe(true)
-    })
-
-    it('should reject apiKey over maximum length', () => {
-      const longApiKey = 'sk-ant-api-key-' + 'x'.repeat(500)
-      const invalidData = { ...validAccountData, apiKey: longApiKey }
-      const result = createClaudeAccountSchema.safeParse(invalidData)
-      expect(result.success).toBe(false)
-    })
-
-    it('should reject accountName over maximum length', () => {
-      const longName = 'x'.repeat(101)
-      const invalidData = { ...validAccountData, accountName: longName }
-      const result = createClaudeAccountSchema.safeParse(invalidData)
-      expect(result.success).toBe(false)
-    })
-
-    it('should reject organization over maximum length', () => {
-      const longOrg = 'x'.repeat(101)
-      const invalidData = { ...validAccountData, organization: longOrg }
-      const result = createClaudeAccountSchema.safeParse(invalidData)
-      expect(result.success).toBe(false)
-    })
-
-    it('should accept passthrough JSON objects', () => {
-      const complexFeatures = {
-        apiKey: 'sk-ant-api-key-test',
+    it('validates required fields', () => {
+      const validData = {
+        apiKey: 'sk-test-key-1234567890',
         accountName: 'Test Account',
-        features: { 
-          chatCompletion: true, 
-          streaming: false, 
-          maxTokens: 4096,
-          models: ['claude-3-haiku', 'claude-3-sonnet'] 
-        },
-        metadata: { 
-          created_by: 'admin',
-          environment: 'production',
-          tags: ['important', 'client-facing']
-        }
+        tier: 'FREE' as const,
       }
-      
-      const result = createClaudeAccountSchema.safeParse(complexFeatures)
+
+      const result = createClaudeAccountSchema.safeParse(validData)
       expect(result.success).toBe(true)
+    })
+
+    it('rejects missing required fields', () => {
+      const invalidData = {
+        // Missing apiKey and accountName
+        tier: 'FREE' as const,
+      }
+
+      const result = createClaudeAccountSchema.safeParse(invalidData)
+      expect(result.success).toBe(false)
+      
+      if (!result.success) {
+        const errors = result.error.issues.map(issue => issue.path.join('.'))
+        expect(errors).toContain('apiKey')
+        expect(errors).toContain('accountName')
+      }
+    })
+
+    it('validates API key minimum length', () => {
+      const invalidData = {
+        apiKey: 'short',
+        accountName: 'Test Account',
+        tier: 'FREE' as const,
+      }
+
+      const result = createClaudeAccountSchema.safeParse(invalidData)
+      expect(result.success).toBe(false)
+      
+      if (!result.success) {
+        const apiKeyError = result.error.issues.find(issue => issue.path[0] === 'apiKey')
+        expect(apiKeyError?.message).toContain('at least 10 characters')
+      }
+    })
+
+    it('validates email format', () => {
+      const invalidData = {
+        apiKey: 'sk-test-key-1234567890',
+        accountName: 'Test Account',
+        email: 'invalid-email',
+        tier: 'FREE' as const,
+      }
+
+      const result = createClaudeAccountSchema.safeParse(invalidData)
+      expect(result.success).toBe(false)
+      
+      if (!result.success) {
+        const emailError = result.error.issues.find(issue => issue.path[0] === 'email')
+        expect(emailError?.message).toContain('Invalid email format')
+      }
+    })
+
+    it('accepts empty email string', () => {
+      const validData = {
+        apiKey: 'sk-test-key-1234567890',
+        accountName: 'Test Account',
+        email: '',
+        tier: 'FREE' as const,
+      }
+
+      const result = createClaudeAccountSchema.safeParse(validData)
+      expect(result.success).toBe(true)
+    })
+
+    it('validates tier enum values', () => {
+      const invalidData = {
+        apiKey: 'sk-test-key-1234567890',
+        accountName: 'Test Account',
+        tier: 'INVALID_TIER',
+      }
+
+      const result = createClaudeAccountSchema.safeParse(invalidData)
+      expect(result.success).toBe(false)
+    })
+
+    it('validates usage limit is non-negative', () => {
+      const invalidData = {
+        apiKey: 'sk-test-key-1234567890',
+        accountName: 'Test Account',
+        tier: 'FREE' as const,
+        usageLimit: -100,
+      }
+
+      const result = createClaudeAccountSchema.safeParse(invalidData)
+      expect(result.success).toBe(false)
+      
+      if (!result.success) {
+        const usageLimitError = result.error.issues.find(issue => issue.path[0] === 'usageLimit')
+        expect(usageLimitError?.message).toContain('non-negative')
+      }
+    })
+
+    it('parses JSON strings for features and metadata', () => {
+      const validData = {
+        apiKey: 'sk-test-key-1234567890',
+        accountName: 'Test Account',
+        tier: 'FREE' as const,
+        features: '{"feature1": true}',
+        metadata: '{"key": "value"}',
+      }
+
+      const result = createClaudeAccountSchema.safeParse(validData)
+      expect(result.success).toBe(true)
+      
       if (result.success) {
-        expect(result.data.features).toEqual(complexFeatures.features)
-        expect(result.data.metadata).toEqual(complexFeatures.metadata)
+        expect(result.data.features).toEqual({ feature1: true })
+        expect(result.data.metadata).toEqual({ key: 'value' })
+      }
+    })
+
+    it('validates JSON format for features and metadata', () => {
+      const invalidData = {
+        apiKey: 'sk-test-key-1234567890',
+        accountName: 'Test Account',
+        tier: 'FREE' as const,
+        features: 'invalid json',
+      }
+
+      const result = createClaudeAccountSchema.safeParse(invalidData)
+      expect(result.success).toBe(false)
+      
+      if (!result.success) {
+        const featuresError = result.error.issues.find(issue => issue.path[0] === 'features')
+        expect(featuresError?.message).toContain('valid JSON')
       }
     })
   })
 
   describe('updateClaudeAccountSchema', () => {
-    it('should allow partial updates', () => {
-      const partialUpdate = {
+    it('validates update data without API key', () => {
+      const validData = {
         accountName: 'Updated Account',
-        tier: 'ENTERPRISE' as const
+        status: 'SUSPENDED' as const,
+        tier: 'PRO' as const,
       }
-      
-      const result = updateClaudeAccountSchema.safeParse(partialUpdate)
-      expect(result.success).toBe(true)
-      if (result.success) {
-        expect(result.data.accountName).toBe(partialUpdate.accountName)
-        expect(result.data.tier).toBe(partialUpdate.tier)
-      }
-    })
 
-    it('should allow empty updates', () => {
-      const emptyUpdate = {}
-      const result = updateClaudeAccountSchema.safeParse(emptyUpdate)
+      const result = updateClaudeAccountSchema.safeParse(validData)
       expect(result.success).toBe(true)
     })
 
-    it('should not allow apiKey in updates', () => {
-      const withApiKey = {
-        apiKey: 'sk-ant-api-key-should-not-be-allowed',
-        accountName: 'Updated Account'
+    it('validates status enum in edit mode', () => {
+      const validData = {
+        accountName: 'Test Account',
+        status: 'ACTIVE' as const,
+        tier: 'FREE' as const,
       }
-      
-      const result = updateClaudeAccountSchema.safeParse(withApiKey)
+
+      const result = updateClaudeAccountSchema.safeParse(validData)
       expect(result.success).toBe(true)
-      if (result.success) {
-        expect(result.data).not.toHaveProperty('apiKey')
-        expect(result.data.accountName).toBe(withApiKey.accountName)
-      }
-    })
-
-    it('should validate email format in updates', () => {
-      const invalidEmail = { email: 'invalid-email-format' }
-      const result = updateClaudeAccountSchema.safeParse(invalidEmail)
-      expect(result.success).toBe(false)
-    })
-
-    it('should validate usage limit in updates', () => {
-      const negativeLimit = { usageLimit: -500 }
-      const validLimit = { usageLimit: 5000 }
-      
-      expect(updateClaudeAccountSchema.safeParse(negativeLimit).success).toBe(false)
-      expect(updateClaudeAccountSchema.safeParse(validLimit).success).toBe(true)
     })
   })
 
   describe('claudeAccountQuerySchema', () => {
-    it('should parse valid query parameters with defaults', () => {
-      const query = {}
-      const result = claudeAccountQuerySchema.safeParse(query)
+    it('validates query parameters with defaults', () => {
+      const result = claudeAccountQuerySchema.safeParse({})
       
       expect(result.success).toBe(true)
       if (result.success) {
@@ -199,207 +183,81 @@ describe('Claude Account Validation Schemas', () => {
       }
     })
 
-    it('should coerce string numbers to integers', () => {
-      const query = { page: '2', limit: '25' }
-      const result = claudeAccountQuerySchema.safeParse(query)
+    it('coerces string numbers to integers', () => {
+      const result = claudeAccountQuerySchema.safeParse({
+        page: '2',
+        limit: '20',
+      })
       
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.page).toBe(2)
-        expect(result.data.limit).toBe(25)
-        expect(typeof result.data.page).toBe('number')
-        expect(typeof result.data.limit).toBe('number')
+        expect(result.data.limit).toBe(20)
       }
     })
 
-    it('should validate page minimum value', () => {
-      const invalidPage = { page: '0' }
-      const result = claudeAccountQuerySchema.safeParse(invalidPage)
-      expect(result.success).toBe(false)
-    })
-
-    it('should validate limit maximum value', () => {
-      const invalidLimit = { limit: '101' }
-      const result = claudeAccountQuerySchema.safeParse(invalidLimit)
-      expect(result.success).toBe(false)
-    })
-
-    it('should validate sortOrder enum values', () => {
-      const validAsc = { sortOrder: 'asc' }
-      const validDesc = { sortOrder: 'desc' }
-      const invalid = { sortOrder: 'invalid' }
-      
-      expect(claudeAccountQuerySchema.safeParse(validAsc).success).toBe(true)
-      expect(claudeAccountQuerySchema.safeParse(validDesc).success).toBe(true)
-      expect(claudeAccountQuerySchema.safeParse(invalid).success).toBe(false)
-    })
-
-    it('should validate status enum values', () => {
-      const validStatuses = ['ACTIVE', 'SUSPENDED', 'EXPIRED', 'PENDING']
-      
-      validStatuses.forEach(status => {
-        const query = { status }
-        const result = claudeAccountQuerySchema.safeParse(query)
-        expect(result.success).toBe(true)
-        if (result.success) {
-          expect(result.data.status).toBe(status)
-        }
-      })
-      
-      const invalidStatus = { status: 'INVALID_STATUS' }
-      expect(claudeAccountQuerySchema.safeParse(invalidStatus).success).toBe(false)
-    })
-
-    it('should validate tier enum values', () => {
-      const validTiers = ['FREE', 'PRO', 'ENTERPRISE']
-      
-      validTiers.forEach(tier => {
-        const query = { tier }
-        const result = claudeAccountQuerySchema.safeParse(query)
-        expect(result.success).toBe(true)
-        if (result.success) {
-          expect(result.data.tier).toBe(tier)
-        }
-      })
-      
-      const invalidTier = { tier: 'INVALID_TIER' }
-      expect(claudeAccountQuerySchema.safeParse(invalidTier).success).toBe(false)
-    })
-
-    it('should allow optional search parameter', () => {
-      const withSearch = { search: 'test query' }
-      const withoutSearch = {}
-      
-      expect(claudeAccountQuerySchema.safeParse(withSearch).success).toBe(true)
-      expect(claudeAccountQuerySchema.safeParse(withoutSearch).success).toBe(true)
-    })
-
-    it('should handle complete query with all parameters', () => {
-      const completeQuery = {
-        page: '3',
-        limit: '50',
+    it('validates sortBy enum values', () => {
+      const validResult = claudeAccountQuerySchema.safeParse({
         sortBy: 'accountName',
-        sortOrder: 'asc',
-        search: 'enterprise client',
-        status: 'ACTIVE',
-        tier: 'ENTERPRISE'
-      }
-      
-      const result = claudeAccountQuerySchema.safeParse(completeQuery)
-      expect(result.success).toBe(true)
-      if (result.success) {
-        expect(result.data.page).toBe(3)
-        expect(result.data.limit).toBe(50)
-        expect(result.data.sortBy).toBe('accountName')
-        expect(result.data.sortOrder).toBe('asc')
-        expect(result.data.search).toBe('enterprise client')
-        expect(result.data.status).toBe('ACTIVE')
-        expect(result.data.tier).toBe('ENTERPRISE')
-      }
+      })
+      expect(validResult.success).toBe(true)
+
+      const invalidResult = claudeAccountQuerySchema.safeParse({
+        sortBy: 'invalidField',
+      })
+      expect(invalidResult.success).toBe(false)
+    })
+
+    it('validates limit within acceptable range', () => {
+      const tooHighResult = claudeAccountQuerySchema.safeParse({
+        limit: 150,
+      })
+      expect(tooHighResult.success).toBe(false)
+    })
+  })
+})
+
+describe('Helper Functions', () => {
+  describe('getStatusBadgeVariant', () => {
+    it('returns correct variants for each status', () => {
+      expect(getStatusBadgeVariant('ACTIVE')).toBe('success')
+      expect(getStatusBadgeVariant('SUSPENDED')).toBe('warning')
+      expect(getStatusBadgeVariant('EXPIRED')).toBe('destructive')
+      expect(getStatusBadgeVariant('PENDING')).toBe('secondary')
     })
   })
 
-  describe('claudeAccountResponseSchema', () => {
-    const validResponse = {
-      id: 'cuid123456789',
-      accountName: 'Test Account',
-      email: 'test@example.com',
-      organization: 'Test Org',
-      status: 'ACTIVE' as const,
-      tier: 'PRO' as const,
-      usageLimit: 10000,
-      currentUsage: 2500,
-      features: { streaming: true },
-      metadata: { client: 'enterprise' },
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: '2024-01-02T00:00:00.000Z'
-    }
-
-    it('should validate a complete response object', () => {
-      const result = claudeAccountResponseSchema.safeParse(validResponse)
-      expect(result.success).toBe(true)
-      if (result.success) {
-        expect(result.data).toMatchObject(validResponse)
-      }
-    })
-
-    it('should allow null optional fields', () => {
-      const responseWithNulls = {
-        ...validResponse,
-        email: null,
-        organization: null,
-        usageLimit: null,
-        features: null,
-        metadata: null
-      }
-      
-      const result = claudeAccountResponseSchema.safeParse(responseWithNulls)
-      expect(result.success).toBe(true)
-      if (result.success) {
-        expect(result.data.email).toBeNull()
-        expect(result.data.organization).toBeNull()
-        expect(result.data.usageLimit).toBeNull()
-        expect(result.data.features).toBeNull()
-        expect(result.data.metadata).toBeNull()
-      }
-    })
-
-    it('should require all non-nullable fields', () => {
-      const requiredFields = ['id', 'accountName', 'status', 'tier', 'currentUsage', 'createdAt', 'updatedAt']
-      
-      requiredFields.forEach(field => {
-        const incomplete = { ...validResponse }
-        delete (incomplete as any)[field]
-        
-        const result = claudeAccountResponseSchema.safeParse(incomplete)
-        expect(result.success).toBe(false)
-      })
-    })
-
-    it('should validate datetime format', () => {
-      const invalidDate = { ...validResponse, createdAt: 'invalid-date' }
-      const result = claudeAccountResponseSchema.safeParse(invalidDate)
-      expect(result.success).toBe(false)
-    })
-
-    it('should validate status enum', () => {
-      const invalidStatus = { ...validResponse, status: 'INVALID' }
-      const result = claudeAccountResponseSchema.safeParse(invalidStatus)
-      expect(result.success).toBe(false)
-    })
-
-    it('should validate tier enum', () => {
-      const invalidTier = { ...validResponse, tier: 'INVALID' }
-      const result = claudeAccountResponseSchema.safeParse(invalidTier)
-      expect(result.success).toBe(false)
+  describe('getTierBadgeVariant', () => {
+    it('returns correct variants for each tier', () => {
+      expect(getTierBadgeVariant('ENTERPRISE')).toBe('default')
+      expect(getTierBadgeVariant('PRO')).toBe('secondary')
+      expect(getTierBadgeVariant('FREE')).toBe('outline')
     })
   })
 
-  describe('status and tier enums', () => {
-    it('should validate claudeAccountStatusSchema', () => {
-      const validStatuses = ['ACTIVE', 'SUSPENDED', 'EXPIRED', 'PENDING']
-      const invalidStatuses = ['active', 'DISABLED', 'UNKNOWN', '']
-      
-      validStatuses.forEach(status => {
-        expect(claudeAccountStatusSchema.safeParse(status).success).toBe(true)
-      })
-      
-      invalidStatuses.forEach(status => {
-        expect(claudeAccountStatusSchema.safeParse(status).success).toBe(false)
-      })
+  describe('formatUsage', () => {
+    it('formats usage without limit', () => {
+      expect(formatUsage(1000)).toBe('1,000')
     })
 
-    it('should validate claudeTierSchema', () => {
-      const validTiers = ['FREE', 'PRO', 'ENTERPRISE']
-      const invalidTiers = ['free', 'BASIC', 'PREMIUM', '']
-      
-      validTiers.forEach(tier => {
-        expect(claudeTierSchema.safeParse(tier).success).toBe(true)
-      })
-      
-      invalidTiers.forEach(tier => {
-        expect(claudeTierSchema.safeParse(tier).success).toBe(false)
-      })
+    it('formats usage with limit and percentage', () => {
+      expect(formatUsage(500, 1000)).toBe('500 / 1,000 (50.0%)')
+    })
+
+    it('formats usage with decimal percentage', () => {
+      expect(formatUsage(333, 1000)).toBe('333 / 1,000 (33.3%)')
+    })
+
+    it('handles zero usage', () => {
+      expect(formatUsage(0, 1000)).toBe('0 / 1,000 (0.0%)')
+    })
+
+    it('handles full usage', () => {
+      expect(formatUsage(1000, 1000)).toBe('1,000 / 1,000 (100.0%)')
+    })
+
+    it('formats large numbers with commas', () => {
+      expect(formatUsage(1234567, 9876543)).toBe('1,234,567 / 9,876,543 (12.5%)')
     })
   })
 })

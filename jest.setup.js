@@ -1,5 +1,6 @@
 // Jest setup file
 const { TextEncoder, TextDecoder } = require('util')
+require('@testing-library/jest-dom')
 
 // Polyfill for Node.js environment
 global.TextEncoder = TextEncoder
@@ -35,6 +36,15 @@ jest.mock('next/navigation', () => ({
   }),
   usePathname: () => '/test-path',
 }))
+
+// Mock SWR
+jest.mock('swr', () => ({
+  __esModule: true,
+  default: jest.fn(),
+}))
+
+// Mock fetch globally
+global.fetch = jest.fn()
 
 // Increase timeout for tests
 jest.setTimeout(30000)

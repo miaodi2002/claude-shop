@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -31,6 +32,7 @@ interface AdminStats {
 export default function AdminDashboard() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -72,7 +74,10 @@ export default function AdminDashboard() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <Button variant="outline">
+          <Button 
+            variant="outline"
+            onClick={() => router.push('/admin/claude-accounts')}
+          >
             Manage Accounts
           </Button>
         </div>
@@ -180,7 +185,11 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Button variant="outline" className="h-20 flex-col">
+                  <Button 
+                    variant="outline" 
+                    className="h-20 flex-col"
+                    onClick={() => router.push('/admin/claude-accounts')}
+                  >
                     <Users className="h-6 w-6 mb-2" />
                     <span className="text-sm">Manage Accounts</span>
                   </Button>
@@ -188,7 +197,11 @@ export default function AdminDashboard() {
                     <DollarSign className="h-6 w-6 mb-2" />
                     <span className="text-sm">View Revenue</span>
                   </Button>
-                  <Button variant="outline" className="h-20 flex-col">
+                  <Button 
+                    variant="outline" 
+                    className="h-20 flex-col"
+                    onClick={() => router.push('/admin/claude-accounts/new')}
+                  >
                     <Database className="h-6 w-6 mb-2" />
                     <span className="text-sm">Add Account</span>
                   </Button>

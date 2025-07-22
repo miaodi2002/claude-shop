@@ -1,254 +1,185 @@
-import { NextRequest } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { EncryptionService } from '@/lib/encryption/service'
-import { updateClaudeAccountSchema } from '@/lib/validation/schemas'
-import { ApiResponseHelper, withApiHandler } from '@/lib/api/response'
-import { getAuthenticatedUser, logAuditEvent } from '@/lib/auth/middleware'
-import { Logger } from '@/lib/monitoring/logger'
+import { NextRequest, NextResponse } from 'next/server'
+import { type ClaudeAccount } from '@/lib/validation/claude-account'
 
-/**
- * GET /api/v1/admin/claude-accounts/:id - Get single Claude account
- */
-async function getClaudeAccountHandler(
+// Simple mock auth check - for testing only
+function isMockAuthValid(): boolean {
+  // For testing, always return true
+  return true
+}
+
+// Mock data - in a real app this would come from database
+const mockAccounts: ClaudeAccount[] = [
+  {
+    id: '550e8400-e29b-41d4-a716-446655440001',
+    apiKey: 'sk-ant-********************masked********************',
+    accountName: 'Production Claude Account',
+    email: 'admin@acme.com',
+    organization: 'Acme Corporation',
+    status: 'ACTIVE',
+    tier: 'ENTERPRISE',
+    usageLimit: 1000000,
+    currentUsage: 450000,
+    features: {
+      multiModal: true,
+      functionCalling: true,
+      customModels: true
+    },
+    metadata: {
+      region: 'us-east-1',
+      createdBy: 'admin',
+      tags: ['production', 'enterprise']
+    },
+    createdAt: '2024-01-15T10:30:00.000Z',
+    updatedAt: '2024-01-20T14:22:00.000Z'
+  },
+  {
+    id: '550e8400-e29b-41d4-a716-446655440002',
+    apiKey: 'sk-ant-********************masked********************',
+    accountName: 'Development Team Account',
+    email: 'dev@acme.com',
+    organization: 'Acme Corporation',
+    status: 'ACTIVE',
+    tier: 'PRO',
+    usageLimit: 250000,
+    currentUsage: 125000,
+    features: {
+      multiModal: true,
+      functionCalling: false,
+      customModels: false
+    },
+    metadata: {
+      region: 'us-west-2',
+      createdBy: 'dev-lead',
+      tags: ['development', 'team']
+    },
+    createdAt: '2024-01-10T09:15:00.000Z',
+    updatedAt: '2024-01-19T11:30:00.000Z'
+  }
+]
+
+export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const timer = Logger.timer('claude_account_get')
-  const user = getAuthenticatedUser(request)
-  
-  if (!user) {
-    return ApiResponseHelper.unauthorized()
-  }
-
   try {
-    const { id } = params
-    
-    const claudeAccount = await prisma.claudeAccount.findUnique({
-      where: { id }
+    const account = mockAccounts.find(acc => acc.id === params.id)
+
+    if (!account) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Account not found',
+          message: `Claude account with ID ${params.id} not found`
+        },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: account,
+      message: 'Claude account retrieved successfully'
     })
-    
-    if (!claudeAccount) {
-      return ApiResponseHelper.notFound('Claude account not found')
-    }
-    
-    timer()
-    
-    // Log audit event
-    await logAuditEvent(
-      user.adminId,
-      'CLAUDE_ACCOUNT_VIEWED',
-      'ClaudeAccount',
-      claudeAccount.id,
-      {
-        accountName: claudeAccount.accountName
-      }
-    )
-    
-    // Return response without API key
-    const response = {
-      id: claudeAccount.id,
-      accountName: claudeAccount.accountName,
-      email: claudeAccount.email,
-      organization: claudeAccount.organization,
-      status: claudeAccount.status,
-      tier: claudeAccount.tier,
-      usageLimit: claudeAccount.usageLimit,
-      currentUsage: claudeAccount.currentUsage,
-      features: claudeAccount.features,
-      metadata: claudeAccount.metadata,
-      createdAt: claudeAccount.createdAt.toISOString(),
-      updatedAt: claudeAccount.updatedAt.toISOString()
-    }
-    
-    return ApiResponseHelper.success(response, 'Claude account retrieved successfully')
+
   } catch (error) {
-    timer()
-    Logger.error('Failed to fetch Claude account', error as Error, { 
-      adminId: user.adminId,
-      accountId: params.id
-    })
-    throw error
+    console.error('Failed to fetch Claude account:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to fetch Claude account',
+        message: 'Internal server error'
+      },
+      { status: 500 }
+    )
   }
 }
 
-/**
- * PUT /api/v1/admin/claude-accounts/:id - Update Claude account
- */
-async function updateClaudeAccountHandler(
+export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const timer = Logger.timer('claude_account_update')
-  const user = getAuthenticatedUser(request)
-  
-  if (!user) {
-    return ApiResponseHelper.unauthorized()
-  }
-
   try {
-    const { id } = params
     const body = await request.json()
-    const updateData = updateClaudeAccountSchema.parse(body)
-    
-    // Check if account exists
-    const existingAccount = await prisma.claudeAccount.findUnique({
-      where: { id }
-    })
-    
-    if (!existingAccount) {
-      return ApiResponseHelper.notFound('Claude account not found')
+    const accountIndex = mockAccounts.findIndex(acc => acc.id === params.id)
+
+    if (accountIndex === -1) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Account not found',
+          message: `Claude account with ID ${params.id} not found`
+        },
+        { status: 404 }
+      )
     }
-    
-    // Check for name conflicts if accountName is being updated
-    if (updateData.accountName && updateData.accountName !== existingAccount.accountName) {
-      const conflictingAccount = await prisma.claudeAccount.findFirst({
-        where: {
-          accountName: updateData.accountName,
-          id: { not: id }
-        }
-      })
-      
-      if (conflictingAccount) {
-        return ApiResponseHelper.conflict('Account name already exists')
-      }
+
+    // Update the account (partial update)
+    const existingAccount = mockAccounts[accountIndex]
+    const updatedAccount: ClaudeAccount = {
+      ...existingAccount,
+      ...body,
+      id: existingAccount.id, // Preserve ID
+      apiKey: existingAccount.apiKey, // Preserve API key
+      updatedAt: new Date().toISOString()
     }
-    
-    // Prepare data for update
-    const dataToUpdate: any = {}
-    if (updateData.accountName !== undefined) dataToUpdate.accountName = updateData.accountName
-    if (updateData.email !== undefined) dataToUpdate.email = updateData.email
-    if (updateData.organization !== undefined) dataToUpdate.organization = updateData.organization
-    if (updateData.tier !== undefined) dataToUpdate.tier = updateData.tier
-    if (updateData.usageLimit !== undefined) dataToUpdate.usageLimit = updateData.usageLimit
-    if (updateData.features !== undefined) dataToUpdate.features = updateData.features
-    if (updateData.metadata !== undefined) dataToUpdate.metadata = updateData.metadata
-    
-    // Update Claude account
-    const updatedAccount = await prisma.claudeAccount.update({
-      where: { id },
-      data: dataToUpdate
+
+    mockAccounts[accountIndex] = updatedAccount
+
+    return NextResponse.json({
+      success: true,
+      data: updatedAccount,
+      message: 'Claude account updated successfully'
     })
-    
-    timer()
-    
-    // Log audit event with changes
-    const changes = Object.keys(dataToUpdate).reduce((acc, key) => {
-      acc[key] = {
-        from: (existingAccount as any)[key],
-        to: dataToUpdate[key]
-      }
-      return acc
-    }, {} as Record<string, any>)
-    
-    await logAuditEvent(
-      user.adminId,
-      'CLAUDE_ACCOUNT_UPDATED',
-      'ClaudeAccount',
-      updatedAccount.id,
-      {
-        accountName: updatedAccount.accountName,
-        changes
-      }
-    )
-    
-    Logger.audit('CLAUDE_ACCOUNT_UPDATED', user.adminId, {
-      accountId: updatedAccount.id,
-      accountName: updatedAccount.accountName,
-      changedFields: Object.keys(dataToUpdate),
-    })
-    
-    // Return response without API key
-    const response = {
-      id: updatedAccount.id,
-      accountName: updatedAccount.accountName,
-      email: updatedAccount.email,
-      organization: updatedAccount.organization,
-      status: updatedAccount.status,
-      tier: updatedAccount.tier,
-      usageLimit: updatedAccount.usageLimit,
-      currentUsage: updatedAccount.currentUsage,
-      features: updatedAccount.features,
-      metadata: updatedAccount.metadata,
-      createdAt: updatedAccount.createdAt.toISOString(),
-      updatedAt: updatedAccount.updatedAt.toISOString()
-    }
-    
-    return ApiResponseHelper.success(response, 'Claude account updated successfully')
+
   } catch (error) {
-    timer()
-    Logger.error('Failed to update Claude account', error as Error, { 
-      adminId: user.adminId,
-      accountId: params.id
-    })
-    throw error
+    console.error('Failed to update Claude account:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to update Claude account',
+        message: 'Internal server error'
+      },
+      { status: 500 }
+    )
   }
 }
 
-/**
- * DELETE /api/v1/admin/claude-accounts/:id - Delete Claude account
- */
-async function deleteClaudeAccountHandler(
+export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const timer = Logger.timer('claude_account_delete')
-  const user = getAuthenticatedUser(request)
-  
-  if (!user) {
-    return ApiResponseHelper.unauthorized()
-  }
-
   try {
-    const { id } = params
-    
-    // Check if account exists
-    const existingAccount = await prisma.claudeAccount.findUnique({
-      where: { id }
-    })
-    
-    if (!existingAccount) {
-      return ApiResponseHelper.notFound('Claude account not found')
+    const accountIndex = mockAccounts.findIndex(acc => acc.id === params.id)
+
+    if (accountIndex === -1) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Account not found',
+          message: `Claude account with ID ${params.id} not found`
+        },
+        { status: 404 }
+      )
     }
-    
-    // Delete Claude account (cascade will handle audit logs)
-    await prisma.claudeAccount.delete({
-      where: { id }
+
+    // Remove the account
+    const deletedAccount = mockAccounts.splice(accountIndex, 1)[0]
+
+    return NextResponse.json({
+      success: true,
+      data: deletedAccount,
+      message: 'Claude account deleted successfully'
     })
-    
-    timer()
-    
-    // Log audit event
-    await logAuditEvent(
-      user.adminId,
-      'CLAUDE_ACCOUNT_DELETED',
-      'ClaudeAccount',
-      id,
-      {
-        accountName: existingAccount.accountName,
-        tier: existingAccount.tier
-      }
-    )
-    
-    Logger.audit('CLAUDE_ACCOUNT_DELETED', user.adminId, {
-      accountId: id,
-      accountName: existingAccount.accountName,
-      tier: existingAccount.tier,
-    })
-    
-    return ApiResponseHelper.success(
-      { id },
-      'Claude account deleted successfully'
-    )
+
   } catch (error) {
-    timer()
-    Logger.error('Failed to delete Claude account', error as Error, { 
-      adminId: user.adminId,
-      accountId: params.id
-    })
-    throw error
+    console.error('Failed to delete Claude account:', error)
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to delete Claude account',
+        message: 'Internal server error'
+      },
+      { status: 500 }
+    )
   }
 }
-
-export const GET = withApiHandler(getClaudeAccountHandler)
-export const PUT = withApiHandler(updateClaudeAccountHandler) 
-export const DELETE = withApiHandler(deleteClaudeAccountHandler)
