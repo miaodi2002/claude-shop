@@ -22,9 +22,15 @@ function buildQueryString(params: Record<string, any>): string {
 
 // Generic fetcher function with error handling
 async function fetcher(url: string, options?: RequestInit) {
+  // Get auth token from localStorage or cookie
+  const authToken = typeof window !== 'undefined' 
+    ? localStorage.getItem('authToken') || document.cookie.match(/authToken=([^;]+)/)?.[1]
+    : '';
+
   const response = await fetch(url, {
     headers: {
       'Content-Type': 'application/json',
+      ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
       ...options?.headers,
     },
     ...options,

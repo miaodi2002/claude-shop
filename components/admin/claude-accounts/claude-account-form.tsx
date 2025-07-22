@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Button } from '@/components/ui/button'
@@ -10,25 +10,26 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Eye, EyeOff, ChevronDown, ChevronRight } from 'lucide-react'
 import { 
-  ClaudeAccount,
-  CreateClaudeAccountData, 
-  UpdateClaudeAccountData,
   createClaudeAccountSchema,
   updateClaudeAccountSchema,
-} from '@/lib/validation/claude-account'
+  type ClaudeAccountResponse,
+} from '@/lib/validation/schemas'
+import { setFormErrors, clearFormErrors } from '@/lib/utils/error-handler'
 
 interface ClaudeAccountFormProps {
-  account?: ClaudeAccount
+  account?: ClaudeAccountResponse
   onSubmit: (data: any) => Promise<void>
   isSubmitting: boolean
   isEditMode?: boolean
+  fieldErrors?: Record<string, string>
 }
 
 export function ClaudeAccountForm({ 
   account, 
   onSubmit, 
   isSubmitting,
-  isEditMode = false 
+  isEditMode = false,
+  fieldErrors = {}
 }: ClaudeAccountFormProps) {
   const [showApiKey, setShowApiKey] = useState(false)
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -38,11 +39,13 @@ export function ClaudeAccountForm({
     handleSubmit,
     setValue,
     watch,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm({
-    // resolver: isEditMode 
-    //   ? zodResolver(updateClaudeAccountSchema) 
-    //   : zodResolver(createClaudeAccountSchema),
+    resolver: isEditMode 
+      ? zodResolver(updateClaudeAccountSchema) 
+      : zodResolver(createClaudeAccountSchema),
     defaultValues: isEditMode && account ? {
       accountName: account.accountName,
       email: account.email || '',
@@ -53,20 +56,50 @@ export function ClaudeAccountForm({
       features: account.features ? JSON.stringify(account.features, null, 2) : '',
       metadata: account.metadata ? JSON.stringify(account.metadata, null, 2) : '',
     } : {
-      tier: 'FREE',
+      accountName: '',
+      email: '',
+      organization: '',
+      tier: 'FREE' as const,
+      usageLimit: undefined,
       features: '',
       metadata: '',
+      apiKey: '',
     }
-  })
+  } as any)
 
   const watchedTier = watch('tier')
   const watchedStatus = watch('status')
 
+  // 处理从父组件传入的字段错误
+  useEffect(() => {
+    if (fieldErrors && Object.keys(fieldErrors).length > 0) {
+      // 清除之前的错误
+      clearErrors()
+      
+      // 设置新的字段错误
+      setFormErrors(setError, fieldErrors)
+    }
+  }, [fieldErrors, setError, clearErrors])
+
+  // 定义所有字段名称用于清除错误
+  const fieldNames = [
+    'accountName', 'email', 'organization', 'tier', 'status', 
+    'usageLimit', 'features', 'metadata', 'apiKey'
+  ]
+
   const handleFormSubmit = async (data: any) => {
+    console.log('📋 Form component: handleFormSubmit called')
+    
+    // 清除之前的字段错误
+    clearFormErrors(clearErrors, fieldNames)
+    
     try {
+      console.log('📋 Form component: Calling onSubmit...')
       await onSubmit(data)
+      console.log('📋 Form component: onSubmit completed successfully')
     } catch (error) {
-      console.error('Form submission error:', error)
+      console.error('📋 Form component: Form submission error:', error)
+      throw error
     }
   }
 
@@ -86,7 +119,7 @@ export function ClaudeAccountForm({
               className={errors.accountName ? 'border-red-500' : ''}
             />
             {errors.accountName && (
-              <p className="text-sm text-red-500">{errors.accountName?.message}</p>
+              <p className="text-sm text-red-500">{String(errors.accountName?.message || errors.accountName)}</p>
             )}
           </div>
 
@@ -100,7 +133,7 @@ export function ClaudeAccountForm({
               className={errors.email ? 'border-red-500' : ''}
             />
             {errors.email && (
-              <p className="text-sm text-red-500">{errors.email?.message}</p>
+              <p className="text-sm text-red-500">{String(errors.email?.message || errors.email)}</p>
             )}
           </div>
         </div>
@@ -114,7 +147,7 @@ export function ClaudeAccountForm({
             className={errors.organization ? 'border-red-500' : ''}
           />
           {errors.organization && (
-            <p className="text-sm text-red-500">{errors.organization?.message}</p>
+            <p className="text-sm text-red-500">{String(errors.organization?.message || errors.organization)}</p>
           )}
         </div>
 
@@ -141,7 +174,7 @@ export function ClaudeAccountForm({
               </Button>
             </div>
             {(errors as any).apiKey && (
-              <p className="text-sm text-red-500">{(errors as any).apiKey?.message}</p>
+              <p className="text-sm text-red-500">{String((errors as any).apiKey?.message || (errors as any).apiKey)}</p>
             )}
           </div>
         )}
@@ -168,7 +201,7 @@ export function ClaudeAccountForm({
               </SelectContent>
             </Select>
             {errors.tier && (
-              <p className="text-sm text-red-500">{errors.tier?.message}</p>
+              <p className="text-sm text-red-500">{String(errors.tier?.message || errors.tier)}</p>
             )}
           </div>
 
@@ -190,7 +223,7 @@ export function ClaudeAccountForm({
                 </SelectContent>
               </Select>
               {errors.status && (
-                <p className="text-sm text-red-500">{errors.status?.message}</p>
+                <p className="text-sm text-red-500">{String(errors.status?.message || errors.status)}</p>
               )}
             </div>
           )}
@@ -206,7 +239,7 @@ export function ClaudeAccountForm({
               className={errors.usageLimit ? 'border-red-500' : ''}
             />
             {errors.usageLimit && (
-              <p className="text-sm text-red-500">{errors.usageLimit?.message}</p>
+              <p className="text-sm text-red-500">{String(errors.usageLimit?.message || errors.usageLimit)}</p>
             )}
           </div>
         </div>
@@ -243,7 +276,7 @@ export function ClaudeAccountForm({
                 }`}
               />
               {errors.features && (
-                <p className="text-sm text-red-500">{errors.features?.message}</p>
+                <p className="text-sm text-red-500">{String(errors.features?.message || errors.features)}</p>
               )}
             </div>
 
@@ -258,7 +291,7 @@ export function ClaudeAccountForm({
                 }`}
               />
               {errors.metadata && (
-                <p className="text-sm text-red-500">{errors.metadata?.message}</p>
+                <p className="text-sm text-red-500">{String(errors.metadata?.message || errors.metadata)}</p>
               )}
             </div>
           </CardContent>

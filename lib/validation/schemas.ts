@@ -173,13 +173,43 @@ export const createClaudeAccountSchema = z.object({
   usageLimit: z.number()
     .positive('Usage limit must be positive')
     .optional(),
-  features: z.object({}).passthrough().optional(),
-  metadata: z.object({}).passthrough().optional()
+  features: z.union([
+    z.string().transform((str, ctx) => {
+      if (!str || str.trim() === '') return undefined
+      try {
+        return JSON.parse(str)
+      } catch (e) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Features must be valid JSON',
+        })
+        return z.NEVER
+      }
+    }),
+    z.object({}).passthrough()
+  ]).optional(),
+  metadata: z.union([
+    z.string().transform((str, ctx) => {
+      if (!str || str.trim() === '') return undefined
+      try {
+        return JSON.parse(str)
+      } catch (e) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Metadata must be valid JSON',
+        })
+        return z.NEVER
+      }
+    }),
+    z.object({}).passthrough()
+  ]).optional()
 })
 
-// 更新 Claude 账户（不包括 apiKey）
+// 更新 Claude 账户（不包括 apiKey，但包括 status）
 export const updateClaudeAccountSchema = createClaudeAccountSchema.partial().omit({ 
   apiKey: true 
+}).extend({
+  status: claudeAccountStatusSchema.optional(),
 })
 
 // Claude 账户查询参数

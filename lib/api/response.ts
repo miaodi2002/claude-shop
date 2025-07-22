@@ -6,6 +6,9 @@ export interface ApiResponse<T = any> {
   data?: T
   error?: string
   message?: string
+  details?: ValidationErrors
+  timestamp?: string
+  requestId?: string
   pagination?: {
     page: number
     limit: number
@@ -14,6 +17,17 @@ export interface ApiResponse<T = any> {
     hasNext: boolean
     hasPrev: boolean
   }
+}
+
+export interface ValidationErrors {
+  [fieldName: string]: string | string[]
+}
+
+/**
+ * Generate request tracking ID
+ */
+function generateRequestId(): string {
+  return `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 }
 
 export interface ApiError {
@@ -25,13 +39,15 @@ export interface ApiError {
 
 export class ApiResponseHelper {
   /**
-   * 成功响应
+   * 成功响应（带时间戳和请求ID）
    */
   static success<T>(data: T, message?: string, statusCode: number = 200): NextResponse {
     const response: ApiResponse<T> = {
       success: true,
       data,
       message,
+      timestamp: new Date().toISOString(),
+      requestId: generateRequestId(),
     }
     
     const nextResponse = NextResponse.json(response, { status: statusCode })
@@ -74,6 +90,19 @@ export class ApiResponseHelper {
   }
 
   /**
+   * 字段验证错误响应
+   */
+  static badRequest(error: string, details?: ValidationErrors): NextResponse {
+    return NextResponse.json({
+      success: false,
+      error,
+      details,
+      timestamp: new Date().toISOString(),
+      requestId: generateRequestId()
+    }, { status: 400 })
+  }
+
+  /**
    * 错误响应
    */
   static error(
@@ -85,6 +114,8 @@ export class ApiResponseHelper {
     const response: ApiResponse = {
       success: false,
       error: message,
+      timestamp: new Date().toISOString(),
+      requestId: generateRequestId(),
     }
     
     // 开发环境包含详细错误信息
@@ -133,10 +164,16 @@ export class ApiResponseHelper {
   }
 
   /**
-   * 冲突错误
+   * 业务逻辑错误响应
    */
-  static conflict(message: string = 'Resource conflict'): NextResponse {
-    return this.error(message, 409, 'CONFLICT')
+  static conflict(error: string, details?: ValidationErrors): NextResponse {
+    return NextResponse.json({
+      success: false,
+      error,
+      details,
+      timestamp: new Date().toISOString(),
+      requestId: generateRequestId()
+    }, { status: 409 })
   }
 
   /**
