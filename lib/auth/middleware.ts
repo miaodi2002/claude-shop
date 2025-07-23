@@ -23,12 +23,19 @@ export async function authMiddleware(request: NextRequest): Promise<NextResponse
       )
     }
     
-    // 将用户信息添加到请求头中，供后续处理使用
-    const response = NextResponse.next()
-    response.headers.set('x-admin-id', session.adminId)
-    response.headers.set('x-admin-username', session.username)
+    // Clone the request with additional headers
+    const requestHeaders = new Headers(request.headers)
+    requestHeaders.set('x-admin-id', session.adminId)
+    requestHeaders.set('x-admin-username', session.username)
     
-    return null // 继续处理请求
+    // Create a new request with the modified headers
+    const response = NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    })
+    
+    return response
   } catch (error) {
     console.error('Auth middleware error:', error)
     return NextResponse.json(
