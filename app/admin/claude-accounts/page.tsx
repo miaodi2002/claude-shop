@@ -41,10 +41,7 @@ export default function ClaudeAccountsPage() {
       mutate()
       
       // 清除URL中的success和t参数
-      const newUrl = new URL(window.location.href)
-      newUrl.searchParams.delete('success')
-      newUrl.searchParams.delete('t')
-      router.replace(newUrl.pathname, { scroll: false })
+      router.replace('/admin/claude-accounts')
       
       // 3秒后自动隐藏成功消息
       setTimeout(() => {
