@@ -69,3 +69,29 @@ temp/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Security - Sensitive files that may contain credentials
+*_credentials.py
+*_secrets.py
+*credential*
+*secret*
+*key*.py
+*token*.py
+aws_*.py
+*quota_checker.py
+config/secrets/
+secrets/
+credentials/
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Environment and configuration files with secrets
+.env
+.env.*
+!.env.example
+config.json
+config.yml
+config.yaml
+settings.json

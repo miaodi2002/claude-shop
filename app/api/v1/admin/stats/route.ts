@@ -19,17 +19,12 @@ async function getAdminStatsHandler(request: NextRequest) {
     // 并行查询所有统计数据
     const [
       accountStats,
-      revenueStats,
       quotaStats,
       recentActivity,
       modelDistribution,
-      priceDistribution,
     ] = await Promise.all([
       // 账户统计
       getAccountStatistics(),
-      
-      // 收入统计
-      getRevenueStatistics(),
       
       // 配额统计
       getQuotaStatistics(),
@@ -39,9 +34,6 @@ async function getAdminStatsHandler(request: NextRequest) {
       
       // 模型分布
       getModelDistribution(),
-      
-      // 价格分布
-      getPriceDistribution(),
     ])
     
     timer()
@@ -53,12 +45,10 @@ async function getAdminStatsHandler(request: NextRequest) {
     
     const response = {
       accounts: accountStats,
-      revenue: revenueStats,
       quotas: quotaStats,
       recentActivity,
       distributions: {
         models: modelDistribution,
-        prices: priceDistribution,
       },
       generatedAt: new Date().toISOString(),
     }
@@ -108,35 +98,7 @@ async function getAccountStatistics() {
   }
 }
 
-/**
- * 获取收入统计
- */
-async function getRevenueStatistics() {
-  const soldAccounts = await prisma.account.findMany({
-    where: { status: 'SOLD' },
-    select: { priceAmount: true, updatedAt: true },
-  })
-  
-  const totalRevenue = soldAccounts.reduce((sum, account) => sum + Number(account.priceAmount), 0)
-  const averagePrice = soldAccounts.length > 0 ? totalRevenue / soldAccounts.length : 0
-  
-  // 计算本月收入
-  const currentMonth = new Date()
-  currentMonth.setDate(1)
-  currentMonth.setHours(0, 0, 0, 0)
-  
-  const monthlyRevenue = soldAccounts
-    .filter(account => account.updatedAt >= currentMonth)
-    .reduce((sum, account) => sum + Number(account.priceAmount), 0)
-  
-  return {
-    total: Number(totalRevenue.toFixed(2)),
-    monthly: Number(monthlyRevenue.toFixed(2)),
-    average: Number(averagePrice.toFixed(2)),
-    currency: 'USD',
-    soldCount: soldAccounts.length,
-  }
-}
+// 收入统计已移除 - priceAmount 字段不再存在
 
 /**
  * 获取配额统计
@@ -146,7 +108,6 @@ async function getQuotaStatistics() {
     by: ['quotaLevel'],
     where: { status: { not: 'MAINTENANCE' } },
     _count: { quotaLevel: true },
-    _avg: { priceAmount: true },
   })
   
   const modelQuotaStats = await prisma.modelQuota.groupBy({
@@ -160,7 +121,6 @@ async function getQuotaStatistics() {
     byLevel: quotaLevelStats.map(stat => ({
       level: stat.quotaLevel,
       count: stat._count.quotaLevel,
-      averagePrice: Number(stat._avg.priceAmount || 0),
     })),
     byModel: modelQuotaStats.map(stat => ({
       modelType: stat.modelType,
@@ -218,43 +178,6 @@ async function getModelDistribution() {
   }))
 }
 
-/**
- * 获取价格分布
- */
-async function getPriceDistribution() {
-  const accounts = await prisma.account.findMany({
-    where: { status: { not: 'MAINTENANCE' } },
-    select: { priceAmount: true },
-  })
-  
-  const prices = accounts.map(account => Number(account.priceAmount))
-  
-  if (prices.length === 0) {
-    return { ranges: [], min: 0, max: 0, average: 0 }
-  }
-  
-  const min = Math.min(...prices)
-  const max = Math.max(...prices)
-  const average = prices.reduce((sum, price) => sum + price, 0) / prices.length
-  
-  // 创建价格区间
-  const ranges = [
-    { min: 0, max: 50, label: '$0 - $50' },
-    { min: 51, max: 100, label: '$51 - $100' },
-    { min: 101, max: 200, label: '$101 - $200' },
-    { min: 201, max: 500, label: '$201 - $500' },
-    { min: 501, max: Infinity, label: '$500+' },
-  ].map(range => ({
-    ...range,
-    count: prices.filter(price => price >= range.min && price <= range.max).length,
-  }))
-  
-  return {
-    ranges: ranges.filter(range => range.count > 0),
-    min,
-    max,
-    average: Number(average.toFixed(2)),
-  }
-}
+// 价格分布统计已移除 - priceAmount 字段不再存在
 
 export const GET = withApiHandler(getAdminStatsHandler)

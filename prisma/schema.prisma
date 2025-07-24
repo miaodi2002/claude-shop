@@ -20,11 +20,7 @@ model Account {
   awsAccessKeyHash  String         // Encrypted AWS Access Key
   awsSecretKeyHash  String         // Encrypted AWS Secret Key
   status            AccountStatus  @default(AVAILABLE)
-  priceAmount       Decimal        @db.Decimal(10, 2)
-  priceCurrency     String         @default("USD")
   instructions      String         @db.Text
-  features          String[]       @default([])
-  limitations       String[]       @default([])
   quotaLevel        QuotaLevel     @default(LOW)
   
   // Relationships
@@ -38,7 +34,6 @@ model Account {
   
   @@index([status])
   @@index([quotaLevel])
-  @@index([priceAmount])
 }
 
 enum AccountStatus {
@@ -153,7 +148,11 @@ enum AuditAction {
   ADMIN_LOGIN_SUCCESS
   ADMIN_LOGIN_FAILED
   ADMIN_LOGOUT
-  PRICE_CHANGED
+  CLAUDE_ACCOUNT_CREATED
+  CLAUDE_ACCOUNT_UPDATED
+  CLAUDE_ACCOUNT_DELETED
+  CLAUDE_ACCOUNT_STATUS_CHANGED
+  CLAUDE_ACCOUNT_VIEWED
 }
 
 // ==================== System Configuration ====================

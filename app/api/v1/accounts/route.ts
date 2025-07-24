@@ -17,13 +17,7 @@ async function getAccountsHandler(request: NextRequest) {
     where.quotaLevel = query.quotaLevel
   }
   
-  // 价格范围过滤
-  if (query.minPrice !== undefined || query.maxPrice !== undefined) {
-    where.priceAmount = {
-      ...(query.minPrice !== undefined && { gte: query.minPrice }),
-      ...(query.maxPrice !== undefined && { lte: query.maxPrice }),
-    }
-  }
+  // 价格范围过滤已移除 - priceAmount字段不再存在
   
   // 模型类型过滤
   if (query.models) {
@@ -41,9 +35,6 @@ async function getAccountsHandler(request: NextRequest) {
   const orderBy: any = {}
   
   switch (field) {
-    case 'price':
-      orderBy.priceAmount = direction
-      break
     case 'created':
       orderBy.createdAt = direction
       break
@@ -73,10 +64,6 @@ async function getAccountsHandler(request: NextRequest) {
     id: account.id,
     displayName: account.displayName,
     description: account.instructions || null, // 使用 instructions 字段作为描述
-    price: {
-      amount: Number(account.priceAmount),
-      currency: account.priceCurrency,
-    },
     quotaLevel: account.quotaLevel,
     primaryModels: account.quotas.map(q => q.modelType),
     stockAvailable: account.status === 'AVAILABLE',

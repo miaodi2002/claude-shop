@@ -8,14 +8,13 @@ import { formatPrice, getQuotaLevelColor, truncateText } from '@/lib/utils'
 interface AccountCardProps {
   account: {
     id: string
+    name: string
     displayName: string
     instructions?: string
-    priceAmount: number
-    priceCurrency: string
     quotaLevel: string
-    features: string[]
     primaryModels: string[]
     stockAvailable: boolean
+    status: string
   }
 }
 
@@ -45,9 +44,12 @@ export function AccountCard({ account }: AccountCardProps) {
 
       <CardContent className="flex-1">
         <div className="space-y-4">
-          {/* Price */}
-          <div className="text-2xl font-bold text-primary">
-            {formatPrice(account.priceAmount, account.priceCurrency)}
+          {/* Status */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Status:</span>
+            <Badge variant={account.status === 'AVAILABLE' ? 'success' : 'secondary'}>
+              {account.status}
+            </Badge>
           </div>
 
           {/* Quota Level */}
@@ -77,24 +79,6 @@ export function AccountCard({ account }: AccountCardProps) {
             </div>
           )}
 
-          {/* Features */}
-          {account.features && account.features.length > 0 && (
-            <div>
-              <span className="text-sm font-medium mb-2 block">Features:</span>
-              <div className="flex flex-wrap gap-1">
-                {account.features.slice(0, 3).map((feature) => (
-                  <Badge key={feature} variant="secondary" className="text-xs">
-                    {feature}
-                  </Badge>
-                ))}
-                {account.features.length > 3 && (
-                  <Badge variant="secondary" className="text-xs">
-                    +{account.features.length - 3} more
-                  </Badge>
-                )}
-              </div>
-            </div>
-          )}
         </div>
       </CardContent>
 

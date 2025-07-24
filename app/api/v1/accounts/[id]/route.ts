@@ -51,10 +51,6 @@ async function getPublicAccountHandler(request: NextRequest, { params }: { param
       id: account.id,
       displayName: account.displayName,
       description: account.instructions || null,
-      price: {
-        amount: Number(account.priceAmount),
-        currency: account.priceCurrency,
-      },
       quotaLevel: account.quotaLevel,
       quotas: account.quotas.map(quota => ({
         modelType: quota.modelType,
@@ -65,8 +61,6 @@ async function getPublicAccountHandler(request: NextRequest, { params }: { param
         },
         isAvailable: quota.isAvailable,
       })),
-      features: account.features,
-      limitations: account.limitations,
       stockAvailable: account.status === 'AVAILABLE',
       createdAt: account.createdAt.toISOString(),
     }

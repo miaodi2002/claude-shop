@@ -72,9 +72,23 @@
 
 ### **Priority 3: Documentation Finalization**
 1. **Deployment Guide** - Step-by-step deployment instructions
-2. **API Documentation** - Complete API endpoint documentation
+2. ✅ **API Documentation** - Interactive API docs with Swagger UI + Redoc (COMPLETED)
 3. **Admin Manual** - Comprehensive admin user guide
 4. **Maintenance Guide** - Ongoing maintenance procedures
+
+### **API Documentation System (NEW)**
+- **URLs**: 
+  - http://localhost:3000/docs - API文档首页
+  - http://localhost:3000/docs/swagger-ui - 交互式API测试
+  - http://localhost:3000/docs/redoc - 美观文档阅读
+- **Components**: Swagger UI + Redoc + Navigation
+- **Source**: /docs/api-specification.yaml (auto-synced to /public/)
+- **Features**: 
+  - 交互式API测试
+  - 自动认证支持
+  - 美观的文档展示
+  - 响应式设计
+- **Workflow**: API变更 → 更新YAML → 文档自动更新
 
 ## 🔄 Recovery Instructions
 
