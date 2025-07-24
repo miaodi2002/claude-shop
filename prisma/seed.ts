@@ -49,11 +49,7 @@ async function main() {
       awsAccessKeyHash: JSON.stringify({ iv: 'sample', encryptedData: 'sample' }),
       awsSecretKeyHash: 'sample_encrypted_secret',
       status: 'AVAILABLE' as const,
-      priceAmount: 299.99,
-      priceCurrency: 'USD',
       instructions: 'High-performance Claude account with premium quotas for enterprise use.',
-      features: ['High RPM limits', 'Premium support', 'Enterprise SLA'],
-      limitations: ['Business use only'],
       quotaLevel: 'HIGH' as const,
       quotas: {
         create: [
@@ -87,11 +83,7 @@ async function main() {
       awsAccessKeyHash: JSON.stringify({ iv: 'sample', encryptedData: 'sample' }),
       awsSecretKeyHash: 'sample_encrypted_secret',
       status: 'AVAILABLE' as const,
-      priceAmount: 149.99,
-      priceCurrency: 'USD',
       instructions: 'Balanced Claude account suitable for most development and business needs.',
-      features: ['Good RPM limits', 'Standard support'],
-      limitations: ['Commercial use allowed'],
       quotaLevel: 'MEDIUM' as const,
       quotas: {
         create: [
@@ -118,11 +110,7 @@ async function main() {
       awsAccessKeyHash: JSON.stringify({ iv: 'sample', encryptedData: 'sample' }),
       awsSecretKeyHash: 'sample_encrypted_secret',
       status: 'AVAILABLE' as const,
-      priceAmount: 49.99,
-      priceCurrency: 'USD',
       instructions: 'Entry-level Claude account perfect for testing and small projects.',
-      features: ['Basic quotas', 'Community support'],
-      limitations: ['Personal use only', 'Rate limited'],
       quotaLevel: 'LOW' as const,
       quotas: {
         create: [

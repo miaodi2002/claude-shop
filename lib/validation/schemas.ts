@@ -36,49 +36,37 @@ export const accountQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(12),
   models: z.string().optional(),
   quotaLevel: quotaLevelSchema.optional(),
-  minPrice: z.coerce.number().min(0).optional(),
-  maxPrice: z.coerce.number().min(0).optional(),
   inStock: z.coerce.boolean().optional(),
-  sortBy: z.enum(['price_asc', 'price_desc', 'created_asc', 'created_desc']).default('created_desc'),
+  sortBy: z.enum(['created_asc', 'created_desc', 'quota_level']).default('created_desc'),
 })
 
 // 创建账户
 export const createAccountSchema = z.object({
+  name: z.string()
+    .min(1, 'Name is required')
+    .max(50, 'Name must not exceed 50 characters')
+    .regex(/^[a-zA-Z0-9-_]+$/, 'Name can only contain letters, numbers, hyphens, and underscores'),
   displayName: z.string()
     .min(1, 'Display name is required')
     .max(100, 'Display name must not exceed 100 characters'),
-  description: z.string()
-    .max(500, 'Description must not exceed 500 characters')
-    .optional(),
-  priceAmount: z.number()
-    .min(0, 'Price must be non-negative'),
-  priceCurrency: z.string()
-    .length(3, 'Currency must be 3 characters')
-    .default('USD'),
-  quotaLevel: quotaLevelSchema,
+  instructions: z.string()
+    .max(2000, 'Instructions must not exceed 2000 characters')
+    .default(''),
+  quotaLevel: quotaLevelSchema.default('LOW'),
   status: accountStatusSchema.default('AVAILABLE'),
-  awsCredentials: z.object({
-    accessKeyId: z.string()
-      .min(16, 'AWS Access Key ID must be at least 16 characters')
-      .max(128, 'AWS Access Key ID must not exceed 128 characters'),
-    secretAccessKey: z.string()
-      .min(40, 'AWS Secret Access Key must be at least 40 characters')
-      .max(128, 'AWS Secret Access Key must not exceed 128 characters'),
-    region: z.string()
-      .min(1, 'AWS region is required')
-      .default('us-east-1'),
-  }),
-  quotas: z.array(z.object({
-    modelType: modelTypeSchema,
-    totalQuota: z.number().int().min(0),
-    usedQuota: z.number().int().min(0).default(0),
-    isAvailable: z.boolean().default(true),
-  })).min(1, 'At least one quota is required'),
+  awsAccessKey: z.string()
+    .min(16, 'AWS Access Key must be at least 16 characters')
+    .max(128, 'AWS Access Key must not exceed 128 characters'),
+  awsSecretKey: z.string()
+    .min(40, 'AWS Secret Key must be at least 40 characters')
+    .max(128, 'AWS Secret Key must not exceed 128 characters'),
 })
 
 // 更新账户
 export const updateAccountSchema = createAccountSchema.partial().omit({
-  awsCredentials: true,
+  name: true,
+  awsAccessKey: true,
+  awsSecretKey: true,
 })
 
 // AWS 凭证更新
@@ -106,27 +94,26 @@ export const refreshQuotaSchema = z.object({
 // API 响应类型
 export const accountListingSchema = z.object({
   id: idSchema,
+  name: z.string(),
   displayName: z.string(),
-  description: z.string().nullable(),
-  price: z.object({
-    amount: z.number(),
-    currency: z.string(),
-  }),
   quotaLevel: quotaLevelSchema,
   primaryModels: z.array(z.string()),
+  status: accountStatusSchema,
   stockAvailable: z.boolean(),
   createdAt: z.string().datetime(),
 })
 
 export const accountDetailSchema = accountListingSchema.extend({
+  instructions: z.string(),
   quotas: z.array(z.object({
-    modelType: modelTypeSchema,
-    totalQuota: z.number(),
-    usedQuota: z.number(),
-    availableQuota: z.number(),
-    isAvailable: z.boolean(),
+    modelName: z.string(),
+    modelDisplayName: z.string(),
+    rpm: z.number(),
+    tpm: z.number(),
+    tpd: z.number(),
+    available: z.boolean(),
   })),
-  status: accountStatusSchema,
+  telegramLink: z.string().optional(),
 })
 
 // 管理员审计日志
@@ -141,7 +128,7 @@ export const auditLogSchema = z.object({
 export function validateSortBy(sortBy: string): { field: string; direction: 'asc' | 'desc' } {
   const [field, direction] = sortBy.split('_')
   
-  const validFields = ['price', 'created', 'updated', 'name']
+  const validFields = ['created', 'updated', 'name', 'quota']
   const validDirections = ['asc', 'desc']
   
   if (!validFields.includes(field) || !validDirections.includes(direction)) {

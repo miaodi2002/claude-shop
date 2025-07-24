@@ -9,20 +9,18 @@ import { Badge } from '@/components/ui/badge'
 
 interface Account {
   id: string
+  name: string
   displayName: string
   instructions?: string
-  priceAmount: number
-  priceCurrency: string
   quotaLevel: string
-  features: string[]
   primaryModels: string[]
   stockAvailable: boolean
+  status: string
 }
 
 interface FilterOptions {
   quotaLevels: Array<{ level: string; count: number }>
   modelTypes: Array<{ modelType: string; count: number }>
-  priceRange: { min: number; max: number; average: number }
   sortOptions: Array<{ value: string; label: string }>
 }
 

@@ -65,10 +65,6 @@ async function getAccountHandler(request: NextRequest, { params }: { params: { i
       name: account.name,
       displayName: account.displayName,
       status: account.status,
-      price: {
-        amount: Number(account.priceAmount),
-        currency: account.priceCurrency,
-      },
       quotaLevel: account.quotaLevel,
       quotas: account.quotas.map(quota => ({
         id: quota.id,
@@ -79,8 +75,6 @@ async function getAccountHandler(request: NextRequest, { params }: { params: { i
         isAvailable: quota.isAvailable,
       })),
       awsCredentials,
-      features: account.features,
-      limitations: account.limitations,
       instructions: account.instructions,
       createdAt: account.createdAt.toISOString(),
       updatedAt: account.updatedAt.toISOString(),
@@ -141,20 +135,13 @@ async function updateAccountHandler(request: NextRequest, { params }: { params: 
       updatePayload.status = updateData.status
     }
     
-    if (updateData.priceAmount !== undefined) {
-      updatePayload.priceAmount = updateData.priceAmount
-    }
-    
-    if (updateData.priceCurrency) {
-      updatePayload.priceCurrency = updateData.priceCurrency
-    }
     
     if (updateData.quotaLevel) {
       updatePayload.quotaLevel = updateData.quotaLevel
     }
     
-    if (updateData.description !== undefined) {
-      updatePayload.instructions = updateData.description
+    if (updateData.instructions !== undefined) {
+      updatePayload.instructions = updateData.instructions
     }
     
     // 更新账户
@@ -191,10 +178,6 @@ async function updateAccountHandler(request: NextRequest, { params }: { params: 
       name: updatedAccount.name,
       displayName: updatedAccount.displayName,
       status: updatedAccount.status,
-      price: {
-        amount: Number(updatedAccount.priceAmount),
-        currency: updatedAccount.priceCurrency,
-      },
       quotaLevel: updatedAccount.quotaLevel,
       quotas: updatedAccount.quotas,
       updatedAt: updatedAccount.updatedAt.toISOString(),

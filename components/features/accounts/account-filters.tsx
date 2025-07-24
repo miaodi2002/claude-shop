@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 interface FilterOptions {
   quotaLevels: Array<{ level: string; count: number }>
   modelTypes: Array<{ modelType: string; count: number }>
-  priceRange: { min: number; max: number; average: number }
   sortOptions: Array<{ value: string; label: string }>
 }
 
@@ -17,14 +16,25 @@ interface AccountFiltersProps {
   activeFilters: {
     quotaLevel?: string
     models?: string[]
-    minPrice?: number
-    maxPrice?: number
     sortBy?: string
   }
   onFilterChange: (filters: any) => void
 }
 
 export function AccountFilters({ filters, activeFilters, onFilterChange }: AccountFiltersProps) {
+  // Add safety checks for filters data
+  if (!filters || !filters.quotaLevels || !filters.modelTypes || !filters.sortOptions) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm text-muted-foreground">Loading filters...</div>
+        </CardContent>
+      </Card>
+    )
+  }
   const handleQuotaLevelChange = (level: string) => {
     onFilterChange({
       ...activeFilters,
@@ -124,24 +134,6 @@ export function AccountFilters({ filters, activeFilters, onFilterChange }: Accou
           </div>
         </div>
 
-        {/* Price Range Info */}
-        <div>
-          <h3 className="font-medium mb-3">Price Range</h3>
-          <div className="text-sm text-muted-foreground space-y-1">
-            <div className="flex justify-between">
-              <span>Min:</span>
-              <span>${filters.priceRange.min}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Max:</span>
-              <span>${filters.priceRange.max}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Average:</span>
-              <span>${filters.priceRange.average}</span>
-            </div>
-          </div>
-        </div>
 
         {/* Sort Options */}
         <div>

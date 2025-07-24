@@ -28,12 +28,7 @@ async function getAdminAccountsHandler(request: NextRequest) {
       where.quotaLevel = query.quotaLevel
     }
     
-    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
-      where.priceAmount = {
-        ...(query.minPrice !== undefined && { gte: query.minPrice }),
-        ...(query.maxPrice !== undefined && { lte: query.maxPrice }),
-      }
-    }
+    // 价格过滤已移除 - priceAmount字段不再存在
     
     if (query.models) {
       const modelTypes = query.models.split(',')
@@ -52,12 +47,6 @@ async function getAdminAccountsHandler(request: NextRequest) {
     // 排序
     const orderBy: any = {}
     switch (query.sortBy) {
-      case 'price_asc':
-        orderBy.priceAmount = 'asc'
-        break
-      case 'price_desc':
-        orderBy.priceAmount = 'desc'
-        break
       case 'created_asc':
         orderBy.createdAt = 'asc'
         break
@@ -94,15 +83,9 @@ async function getAdminAccountsHandler(request: NextRequest) {
       name: account.name,
       displayName: account.displayName,
       status: account.status,
-      price: {
-        amount: Number(account.priceAmount),
-        currency: account.priceCurrency,
-      },
       quotaLevel: account.quotaLevel,
       quotas: account.quotas,
       hasEncryptedCredentials: !!account.awsAccessKeyHash,
-      features: account.features,
-      limitations: account.limitations,
       instructions: account.instructions,
       createdAt: account.createdAt.toISOString(),
       updatedAt: account.updatedAt.toISOString(),
@@ -159,31 +142,22 @@ async function createAccountHandler(request: NextRequest) {
     }
     
     // 加密 AWS 凭证
-    const encryptedCredentials = EncryptionService.encryptAWSCredentials(accountData.awsCredentials)
+    const encryptedCredentials = EncryptionService.encryptAWSCredentials({
+      accessKeyId: accountData.awsAccessKey,
+      secretAccessKey: accountData.awsSecretKey,
+      region: 'us-east-1' // default region
+    })
     
     // 创建账户和配额
     const account = await prisma.account.create({
       data: {
-        name: accountData.displayName,
+        name: accountData.name,
         displayName: accountData.displayName,
         awsAccessKeyHash: JSON.stringify(encryptedCredentials),
         awsSecretKeyHash: '', // 暂时为空，后续可以分离存储
         status: accountData.status,
-        priceAmount: accountData.priceAmount,
-        priceCurrency: accountData.priceCurrency,
-        instructions: accountData.description || '',
-        features: [],
-        limitations: [],
+        instructions: accountData.instructions || '',
         quotaLevel: accountData.quotaLevel,
-        quotas: {
-          create: accountData.quotas.map(quota => ({
-            modelType: quota.modelType as any,
-            rpm: quota.totalQuota, // 临时映射
-            tpm: quota.totalQuota * 1000, // 估算
-            tpd: quota.totalQuota * 1000 * 24, // 估算
-            isAvailable: quota.isAvailable,
-          })),
-        },
       },
       include: {
         quotas: true,
@@ -201,7 +175,6 @@ async function createAccountHandler(request: NextRequest) {
       {
         accountName: account.name,
         quotaLevel: account.quotaLevel,
-        price: account.priceAmount,
       }
     )
     
@@ -217,10 +190,6 @@ async function createAccountHandler(request: NextRequest) {
       name: account.name,
       displayName: account.displayName,
       status: account.status,
-      price: {
-        amount: Number(account.priceAmount),
-        currency: account.priceCurrency,
-      },
       quotaLevel: account.quotaLevel,
       quotas: account.quotas,
       createdAt: account.createdAt.toISOString(),

@@ -6,7 +6,7 @@ import { Logger } from '@/lib/monitoring/logger'
 
 const searchSchema = z.object({
   q: z.string().min(1, 'Search query is required').max(100, 'Search query too long'),
-  type: z.enum(['accounts', 'features', 'all']).default('all'),
+  type: z.enum(['accounts', 'all']).default('all'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(50).default(10),
 })
@@ -28,7 +28,7 @@ async function searchHandler(request: NextRequest) {
       OR: [
         { displayName: { contains: searchTerm, mode: 'insensitive' as const } },
         { instructions: { contains: searchTerm, mode: 'insensitive' as const } },
-        { features: { hasSome: [searchTerm] } },
+        // features 字段已移除
         { 
           quotas: {
             some: {
@@ -72,10 +72,7 @@ async function searchHandler(request: NextRequest) {
         description: account.instructions ? 
           `${account.instructions.slice(0, 100)}${account.instructions.length > 100 ? '...' : ''}` : 
           null,
-        price: {
-          amount: Number(account.priceAmount),
-          currency: account.priceCurrency,
-        },
+        // price 字段已移除
         quotaLevel: account.quotaLevel,
         modelTypes: account.quotas.map(q => q.modelType),
         url: `/account/${account.id}`,
@@ -148,10 +145,7 @@ function calculateRelevanceScore(searchTerm: string, account: any): number {
     score += 30
   }
   
-  // 特性匹配
-  if (account.features && account.features.some((f: string) => f.toLowerCase().includes(term))) {
-    score += 40
-  }
+  // 特性匹配已移除 - features 字段不再存在
   
   // 模型类型匹配
   const hasModelMatch = account.quotas && account.quotas.some((q: any) => 
@@ -190,23 +184,10 @@ async function generateSearchSuggestions(searchTerm: string): Promise<string[]> 
       suggestions.add(account.displayName)
     })
     
-    // 获取相关特性
-    const accounts = await prisma.account.findMany({
-      where: { status: 'AVAILABLE' as any },
-      select: { features: true },
-      take: 20,
-    })
-    
-    accounts.forEach(account => {
-      account.features.forEach(feature => {
-        if (feature.toLowerCase().includes(searchTerm.toLowerCase())) {
-          suggestions.add(feature)
-        }
-      })
-    })
+    // 特性相关建议已移除 - features 字段不再存在
     
     // 添加热门搜索词
-    const popularTerms = ['claude', 'sonnet', 'haiku', 'opus', 'high quota', 'low price']
+    const popularTerms = ['claude', 'sonnet', 'haiku', 'opus', 'high quota']
     popularTerms.forEach(term => {
       if (term.includes(searchTerm.toLowerCase()) && term !== searchTerm.toLowerCase()) {
         suggestions.add(term)
